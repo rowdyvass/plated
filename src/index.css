@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors - L'Institut Theme */
+  --color-foundation-100: #FFFEFA;
+  --color-foundation-200: #FAF6F1;
+  --color-foundation-300: #F5EDE4;
+  --color-foundation-500: #D4C9BB;
+
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #2C2C2C;
+  --color-text-tertiary: #5C5C5C;
+  --color-text-muted: #8C8C8C;
+
+  --color-accent-primary: #B87333;
+  --color-accent-star: #D4AF37;
+  --color-copper: #B87333;
+
+  --color-ceramic-surface: #FEFEFA;
+  --color-ceramic-rim: #F8F4EC;
+
+  --color-state-success: #4A6741;
+  --color-state-warning: #B8860B;
+  --color-state-error: #8B4049;
+
+  /* Typography */
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Font sizes */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 48px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-foundation-100);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
