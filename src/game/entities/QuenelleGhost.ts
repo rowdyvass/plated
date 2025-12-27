@@ -24,9 +24,11 @@ export class QuenelleGhost extends Container {
   private graphics: Graphics;
   private pauseGraphics: Graphics;
   private quenelleGraphics: Graphics;
+  private motionGraphics: Graphics; // For animated motion indicator
   private baseOpacity: number;
   private pulsePhase = 0;
   private pausePulsePhase = 0;
+  private motionPhase = 0; // For marching ants animation
   private animating = true;
   private color: number;
   private strokeWidth: number;
@@ -37,6 +39,9 @@ export class QuenelleGhost extends Container {
   private pauseRadius: number;
   private quenellePosition: { x: number; y: number };
   private quenelleRotation: number; // Renamed from 'rotation' to avoid conflict with Container
+
+  // Cached arc points for animation
+  private arcPoints: { x: number; y: number }[] = [];
 
   // Pause state tracking
   private pauseActive = false;
@@ -69,14 +74,17 @@ export class QuenelleGhost extends Container {
     this.graphics = new Graphics();
     this.pauseGraphics = new Graphics();
     this.quenelleGraphics = new Graphics();
+    this.motionGraphics = new Graphics();
 
     this.addChild(this.graphics);
+    this.addChild(this.motionGraphics);
     this.addChild(this.pauseGraphics);
     this.addChild(this.quenelleGraphics);
 
     this.drawArcPath();
     this.drawPauseIndicator();
     this.drawQuenelleOutline();
+    this.drawMotionIndicator();
 
     this.alpha = this.baseOpacity;
   }
@@ -85,22 +93,24 @@ export class QuenelleGhost extends Container {
    * Draw the curved arc path showing the scooping motion
    */
   private drawArcPath(): void {
-    // Generate arc path from start to pause position
-    const arcPoints = this.generateArcPoints(this.arcStart, this.pausePosition, 30);
+    // Generate arc path from start to pause position and cache it
+    this.arcPoints = this.generateArcPoints(this.arcStart, this.pausePosition, 30);
 
-    // Draw start indicator
+    // Draw start indicator (larger, more visible)
+    this.graphics.circle(this.arcStart.x, this.arcStart.y, 8);
+    this.graphics.fill({ color: this.color, alpha: 0.15 });
     this.graphics.circle(this.arcStart.x, this.arcStart.y, 5);
     this.graphics.fill({ color: this.color, alpha: 0.4 });
 
     // Draw dashed arc path
-    this.drawDashedPath(arcPoints);
+    this.drawDashedPath(this.arcPoints);
 
     // Draw small arrow near pause to indicate direction
-    if (arcPoints.length > 2) {
-      const lastIdx = arcPoints.length - 1;
+    if (this.arcPoints.length > 2) {
+      const lastIdx = this.arcPoints.length - 1;
       const prevIdx = lastIdx - 3;
-      const dx = arcPoints[lastIdx].x - arcPoints[prevIdx].x;
-      const dy = arcPoints[lastIdx].y - arcPoints[prevIdx].y;
+      const dx = this.arcPoints[lastIdx].x - this.arcPoints[prevIdx].x;
+      const dy = this.arcPoints[lastIdx].y - this.arcPoints[prevIdx].y;
       const len = Math.sqrt(dx * dx + dy * dy);
 
       if (len > 0) {
@@ -110,8 +120,8 @@ export class QuenelleGhost extends Container {
         const perpX = -ny;
         const perpY = nx;
 
-        const arrowX = arcPoints[lastIdx].x;
-        const arrowY = arcPoints[lastIdx].y;
+        const arrowX = this.arcPoints[lastIdx].x;
+        const arrowY = this.arcPoints[lastIdx].y;
 
         this.graphics.moveTo(arrowX, arrowY);
         this.graphics.lineTo(
@@ -282,6 +292,94 @@ export class QuenelleGhost extends Container {
   }
 
   /**
+   * Draw animated motion indicator showing drag direction
+   * This is redrawn each frame to animate
+   */
+  private drawMotionIndicator(): void {
+    if (this.arcPoints.length < 2) return;
+    this.updateMotionIndicator();
+  }
+
+  /**
+   * Update the animated motion indicator
+   * Shows a moving dot along the arc path to indicate drag direction
+   */
+  private updateMotionIndicator(): void {
+    this.motionGraphics.clear();
+    if (this.arcPoints.length < 2 || this.pauseActive) return;
+
+    // Calculate cumulative distances for the arc
+    const distances: number[] = [0];
+    for (let i = 1; i < this.arcPoints.length; i++) {
+      const dx = this.arcPoints[i].x - this.arcPoints[i - 1].x;
+      const dy = this.arcPoints[i].y - this.arcPoints[i - 1].y;
+      distances.push(distances[i - 1] + Math.sqrt(dx * dx + dy * dy));
+    }
+    const totalLength = distances[distances.length - 1];
+
+    // Draw multiple animated dots moving along the path (marching ants effect)
+    const numDots = 3;
+    const dotSpacing = totalLength / numDots;
+
+    for (let d = 0; d < numDots; d++) {
+      // Each dot is offset and wraps around
+      const dotOffset = (this.motionPhase * totalLength + d * dotSpacing) % totalLength;
+      const dotPos = this.getPointAtDistanceFromArray(this.arcPoints, distances, dotOffset);
+
+      if (dotPos) {
+        // Fade dots based on position (fade out near end, fade in at start)
+        const progress = dotOffset / totalLength;
+        const fadeIn = Math.min(1, progress * 4); // Quick fade in at start
+        const fadeOut = Math.min(1, (1 - progress) * 3); // Fade out near pause zone
+        const dotAlpha = fadeIn * fadeOut * 0.7;
+
+        // Draw dot with glow
+        this.motionGraphics.circle(dotPos.x, dotPos.y, 6);
+        this.motionGraphics.fill({ color: this.color, alpha: dotAlpha * 0.3 });
+        this.motionGraphics.circle(dotPos.x, dotPos.y, 4);
+        this.motionGraphics.fill({ color: this.color, alpha: dotAlpha * 0.6 });
+        this.motionGraphics.circle(dotPos.x, dotPos.y, 2);
+        this.motionGraphics.fill({ color: this.color, alpha: dotAlpha });
+      }
+    }
+
+    // Draw a finger/touch indicator at the start point with animation
+    const fingerPulse = 1 + Math.sin(this.pulsePhase * 2) * 0.15;
+    const fingerRadius = 12 * fingerPulse;
+
+    // Outer ring (touch point indicator)
+    this.motionGraphics.circle(this.arcStart.x, this.arcStart.y, fingerRadius);
+    this.motionGraphics.stroke({ color: this.color, width: 2, alpha: 0.4 });
+
+    // Inner filled circle
+    this.motionGraphics.circle(this.arcStart.x, this.arcStart.y, 6);
+    this.motionGraphics.fill({ color: this.color, alpha: 0.5 });
+  }
+
+  /**
+   * Get point at distance along arc path
+   */
+  private getPointAtDistanceFromArray(
+    points: { x: number; y: number }[],
+    distances: number[],
+    targetDist: number
+  ): { x: number; y: number } | null {
+    for (let i = 1; i < distances.length; i++) {
+      if (distances[i] >= targetDist) {
+        const segmentStart = distances[i - 1];
+        const segmentLength = distances[i] - segmentStart;
+        if (segmentLength < 0.01) return points[i - 1];
+        const t = (targetDist - segmentStart) / segmentLength;
+        return {
+          x: points[i - 1].x + (points[i].x - points[i - 1].x) * t,
+          y: points[i - 1].y + (points[i].y - points[i - 1].y) * t,
+        };
+      }
+    }
+    return points[points.length - 1];
+  }
+
+  /**
    * Transform a point by translation and rotation
    */
   private transformPoint(
@@ -446,8 +544,16 @@ export class QuenelleGhost extends Container {
       this.pausePulsePhase -= Math.PI * 2;
     }
 
-    // Update pause indicator appearance
+    // Motion indicator animation (dots moving along arc)
+    // Complete one cycle every 1.5 seconds
+    this.motionPhase += deltaMs / 1500;
+    if (this.motionPhase > 1) {
+      this.motionPhase -= 1;
+    }
+
+    // Update animated elements
     this.updatePauseIndicator();
+    this.updateMotionIndicator();
   }
 
   /**

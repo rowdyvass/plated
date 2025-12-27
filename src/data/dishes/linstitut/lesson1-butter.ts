@@ -16,7 +16,7 @@ export const lesson1Butter: DishDefinition = {
       name: 'Butter',
       gesture: 'place',
       hintText: 'place',
-      shape: { type: 'roundRect', width: 48, height: 48, radius: 4 },
+      shape: { type: 'roundRect', width: 48, height: 32, radius: 2 },
     },
   ],
 

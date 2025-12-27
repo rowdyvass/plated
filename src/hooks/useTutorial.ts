@@ -31,7 +31,7 @@ export function useTutorial(restaurantId: string, dishId: string): TutorialSetti
     level,
     showHints: isTutorialRestaurant && !isFinalExam,
     showGhostHighlight: isTutorialRestaurant,
-    showDemonstration: isTutorialRestaurant && !isFinalExam,
+    showDemonstration: false, // Disabled - no plating preview
     showLessonIntro: isTutorialRestaurant,
   };
 }

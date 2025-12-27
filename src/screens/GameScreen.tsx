@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Game, type SwooshResult, type DotResult, type ScatterResult, type PlaceResult } from '@/game';
+import { Game, type SwooshResult, type DotResult, type ScatterResult, type PlaceResult, type QuenelleResult } from '@/game';
 import { IngredientTray, IngredientLabel, GameHeader } from '@/components/game';
 import { Toast } from '@/components/ui';
 import { TutorialManager, LessonIntro, Demonstration } from '@/components/tutorial';
 import { useGameStore } from '@/stores/gameStore';
-import { useTutorial } from '@/hooks';
+import { useTutorial, useIsTouchDevice } from '@/hooks';
 import { lesson1Butter } from '@/data/dishes/linstitut/lesson1-butter';
 import { getLessonByDishId } from '@/data/restaurants/linstitut';
 import { audioManager } from '@/audio';
@@ -61,6 +61,14 @@ function getPlaceResultToastMessage(result: PlaceResult): string | null {
   return 'Missed.';
 }
 
+function getQuenelleToastMessage(result: QuenelleResult): string | null {
+  if (result.techniqueScore >= 90) return 'Perfect.';
+  if (result.techniqueScore >= 70) return 'Good.';
+  if (result.techniqueScore >= 50) return 'Acceptable.';
+  if (result.success) return null;
+  return 'Missed.';
+}
+
 interface DragState {
   x: number;
   y: number;
@@ -95,6 +103,13 @@ interface DrizzleState {
   ingredientId: string | null;
 }
 
+// Track quenelle state
+interface QuenelleState {
+  selected: boolean;    // Ingredient tapped and ready for quenelle gesture
+  active: boolean;      // Currently performing quenelle gesture on plate
+  ingredientId: string | null;
+}
+
 // Track multipoint place state (for ingredients with count > 1)
 interface MultipointPlaceState {
   active: boolean;
@@ -116,6 +131,7 @@ export function GameScreen() {
   const [dotState, setDotState] = useState<DotState>({ selected: false, ingredientId: null, remainingCount: 0 });
   const [scatterState, setScatterState] = useState<ScatterState>({ selected: false, active: false, ingredientId: null });
   const [drizzleState, setDrizzleState] = useState<DrizzleState>({ selected: false, active: false, ingredientId: null });
+  const [quenelleState, setQuenelleState] = useState<QuenelleState>({ selected: false, active: false, ingredientId: null });
   const [multipointPlaceState, setMultipointPlaceState] = useState<MultipointPlaceState>({ active: false, ingredientId: null, remainingCount: 0, totalCount: 0 });
   const [isOverTarget, setIsOverTarget] = useState(false);
 
@@ -152,6 +168,11 @@ export function GameScreen() {
   // Get tutorial settings
   const tutorial = useTutorial(dish.restaurant, dish.id);
 
+  // Touch device detection for drag offset
+  const isTouchDevice = useIsTouchDevice();
+  // Offset the drag preview up and left so it's visible above the finger
+  const touchDragOffset = isTouchDevice ? { x: -30, y: -60 } : { x: 0, y: 0 };
+
   // Get lesson metadata for intro screen
   const lessonData = useMemo(() => {
     return getLessonByDishId(dish.id);
@@ -163,7 +184,7 @@ export function GameScreen() {
     const restaurantRoutes: Record<string, string> = {
       'linstitut': '/linstitut',
     };
-    return restaurantRoutes[dish.restaurant] || '/levels';
+    return restaurantRoutes[dish.restaurant] || '/linstitut';
   }, [dish.restaurant]);
 
   // Get the gesture type for the current ingredient
@@ -217,6 +238,14 @@ export function GameScreen() {
     setDrizzleState({ selected: true, active: false, ingredientId: currentIngredient.id });
   }, [currentIngredient, timerState]);
 
+  // Handle quenelle ingredient selection (tap on tray)
+  const handleQuenelleSelect = useCallback(() => {
+    if (!currentIngredient || timerState === 'expired') return;
+
+    audioManager.play('place_pickup');
+    setQuenelleState({ selected: true, active: false, ingredientId: currentIngredient.id });
+  }, [currentIngredient, timerState]);
+
   // Auto-select swoosh ingredients when they become active
   useEffect(() => {
     if (currentIngredientDef?.gesture === 'swoosh' && currentIngredient && !swooshState.selected) {
@@ -246,6 +275,13 @@ export function GameScreen() {
       setDrizzleState({ selected: true, active: false, ingredientId: currentIngredient.id });
     }
   }, [currentIngredient, currentIngredientDef, drizzleState.selected]);
+
+  // Auto-select quenelle ingredients when they become active
+  useEffect(() => {
+    if (currentIngredientDef?.gesture === 'quenelle' && currentIngredient && !quenelleState.selected) {
+      setQuenelleState({ selected: true, active: false, ingredientId: currentIngredient.id });
+    }
+  }, [currentIngredient, currentIngredientDef, quenelleState.selected]);
 
   // Get toast message - prioritize time expired, then swoosh, then precision
   const getToastMessageToShow = (): string | null => {
@@ -470,15 +506,16 @@ export function GameScreen() {
     setIsOverTarget(false);
   }, [currentIngredient, currentIngredientDef, dish.ingredients, placedElements, placeElement, setCurrentIngredient, setIsDragging, recordPrecision, completeDish]);
 
-  // Canvas pointer handlers for swoosh, dot, scatter, and drizzle gestures (draw/tap directly on plate)
+  // Canvas pointer handlers for swoosh, dot, scatter, drizzle, and quenelle gestures (draw/tap directly on plate)
   const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
-    // Check if swoosh, dot, scatter, or drizzle is selected
+    // Check if swoosh, dot, scatter, drizzle, or quenelle is selected
     const isSwooshSelected = swooshState.selected;
     const isDotSelected = dotState.selected;
     const isScatterSelected = scatterState.selected;
     const isDrizzleSelected = drizzleState.selected;
+    const isQuenelleSelected = quenelleState.selected;
 
-    if ((!isSwooshSelected && !isDotSelected && !isScatterSelected && !isDrizzleSelected) || !currentIngredient || timerState === 'expired') return;
+    if ((!isSwooshSelected && !isDotSelected && !isScatterSelected && !isDrizzleSelected && !isQuenelleSelected) || !currentIngredient || timerState === 'expired') return;
     // Ignore if we're already tracking a pointer
     if (activePointerRef.current !== null) return;
 
@@ -524,15 +561,23 @@ export function GameScreen() {
           pressure: 0.5,
         });
         setDrizzleState(prev => ({ ...prev, active: true }));
+      } else if (isQuenelleSelected) {
+        game.startQuenelle(currentIngredient.id, {
+          x: canvasX,
+          y: canvasY,
+          timestamp: performance.now(),
+          pressure: 0.5,
+        });
+        setQuenelleState(prev => ({ ...prev, active: true }));
       }
       // For dot gestures, we just track the pointer but don't start anything special
     }
-  }, [swooshState.selected, dotState.selected, scatterState.selected, drizzleState.selected, currentIngredient, timerState]);
+  }, [swooshState.selected, dotState.selected, scatterState.selected, drizzleState.selected, quenelleState.selected, currentIngredient, timerState]);
 
   const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
     // Only handle move for the active pointer
     if (activePointerRef.current !== e.pointerId) return;
-    if ((!swooshState.active && !scatterState.active && !drizzleState.active) || !currentIngredient) return;
+    if ((!swooshState.active && !scatterState.active && !drizzleState.active && !quenelleState.active) || !currentIngredient) return;
 
     const game = gameRef.current;
     const canvas = containerRef.current?.querySelector('canvas');
@@ -563,8 +608,15 @@ export function GameScreen() {
         timestamp: performance.now(),
         pressure: 0.5,
       });
+    } else if (quenelleState.active) {
+      game.updateQuenelle({
+        x: canvasX,
+        y: canvasY,
+        timestamp: performance.now(),
+        pressure: 0.5,
+      });
     }
-  }, [swooshState.active, scatterState.active, drizzleState.active, currentIngredient]);
+  }, [swooshState.active, scatterState.active, drizzleState.active, quenelleState.active, currentIngredient]);
 
   const handleCanvasPointerUp = useCallback((e: React.PointerEvent) => {
     const container = containerRef.current;
@@ -806,6 +858,74 @@ export function GameScreen() {
       return;
     }
 
+    // Handle QUENELLE gesture
+    if (quenelleState.active && currentIngredient && game && canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const canvasX = e.clientX - rect.left;
+      const canvasY = e.clientY - rect.top;
+
+      // End quenelle and get result
+      const result = game.endQuenelle({
+        x: canvasX,
+        y: canvasY,
+        timestamp: performance.now(),
+        pressure: 0.5,
+      });
+
+      if (result) {
+        // Show toast for quenelle result
+        const toastMsg = getQuenelleToastMessage(result);
+        if (toastMsg) {
+          setSwooshToast(toastMsg);
+        }
+
+        // Play feedback sound
+        setTimeout(() => {
+          if (result.techniqueScore >= 90) {
+            audioManager.play('perfect');
+          } else if (result.techniqueScore >= 70) {
+            audioManager.play('great');
+          } else if (result.techniqueScore >= 50) {
+            audioManager.play('good');
+          } else {
+            audioManager.play('miss');
+          }
+        }, 100);
+
+        // Record precision
+        recordPrecision({
+          zone: result.techniqueScore >= 90 ? 'perfect'
+            : result.techniqueScore >= 70 ? 'great'
+            : result.techniqueScore >= 50 ? 'good'
+            : result.success ? 'acceptable' : 'miss',
+          score: result.techniqueScore,
+          distance: 0,
+          maxDistance: 0,
+        });
+
+        // Mark element as placed
+        placeElement(currentIngredient.id, 0, 0);
+
+        // Move to next ingredient or complete dish
+        const currentId = currentIngredient.id;
+        const next = dish.ingredients.find(i => i.id !== currentId && !placedElements.some(p => p.id === i.id));
+
+        if (next) {
+          setCurrentIngredient({ id: next.id, name: next.name });
+          game.showGhostForIngredient(next.id);
+        } else {
+          setCurrentIngredient(null);
+          setTimeout(() => {
+            completeDish();
+          }, 300);
+        }
+      }
+
+      // Reset quenelle state
+      setQuenelleState({ selected: false, active: false, ingredientId: null });
+      return;
+    }
+
     // Handle SWOOSH gesture
     if (!swooshState.active || !currentIngredient || !game) {
       // If selected but not active, clicking elsewhere deselects swoosh
@@ -819,6 +939,10 @@ export function GameScreen() {
       // If drizzle is selected but not active, clicking elsewhere deselects
       if (drizzleState.selected && !drizzleState.active) {
         setDrizzleState({ selected: false, active: false, ingredientId: null });
+      }
+      // If quenelle is selected but not active, clicking elsewhere deselects
+      if (quenelleState.selected && !quenelleState.active) {
+        setQuenelleState({ selected: false, active: false, ingredientId: null });
       }
       // Don't deselect dot on off-plate clicks - keep it selected so player can continue tapping
       // Dots stay selected until all are placed
@@ -892,7 +1016,7 @@ export function GameScreen() {
 
     // Reset swoosh state
     setSwooshState({ selected: false, active: false, ingredientId: null });
-  }, [currentIngredient, dish.ingredients, placedElements, placeElement, setCurrentIngredient, recordPrecision, completeDish, swooshState.selected, swooshState.active, dotState.selected, scatterState.selected, scatterState.active, drizzleState.selected, drizzleState.active]);
+  }, [currentIngredient, dish.ingredients, placedElements, placeElement, setCurrentIngredient, recordPrecision, completeDish, swooshState.selected, swooshState.active, dotState.selected, scatterState.selected, scatterState.active, drizzleState.selected, drizzleState.active, quenelleState.selected, quenelleState.active]);
 
   // Initialize game when ready
   const initGame = useCallback(() => {
@@ -963,12 +1087,12 @@ export function GameScreen() {
   // Disable interactions during non-playing phases
   const canInteract = phase === 'playing';
 
-  // Disable canvas pointer events when swoosh, dot, scatter, or drizzle is selected so React handlers work
+  // Disable canvas pointer events when swoosh, dot, scatter, drizzle, or quenelle is selected so React handlers work
   useEffect(() => {
     const canvas = containerRef.current?.querySelector('canvas');
     if (!canvas) return;
 
-    if (swooshState.selected || dotState.selected || scatterState.selected || drizzleState.selected) {
+    if (swooshState.selected || dotState.selected || scatterState.selected || drizzleState.selected || quenelleState.selected) {
       canvas.style.pointerEvents = 'none';
     } else {
       canvas.style.pointerEvents = 'auto';
@@ -979,7 +1103,7 @@ export function GameScreen() {
         canvas.style.pointerEvents = 'auto';
       }
     };
-  }, [swooshState.selected, dotState.selected, scatterState.selected, drizzleState.selected]);
+  }, [swooshState.selected, dotState.selected, scatterState.selected, drizzleState.selected, quenelleState.selected]);
 
   // Determine the drag overlay style based on current ingredient
   const getDragOverlayStyle = (): React.CSSProperties => {
@@ -988,8 +1112,8 @@ export function GameScreen() {
     const ingredient = dish.ingredients.find(i => i.id === currentIngredient.id);
     if (!ingredient) return {};
 
-    // Don't show overlay for swoosh, scatter, or drizzle gestures (rendered on canvas)
-    if (ingredient.gesture === 'swoosh' || ingredient.gesture === 'scatter' || ingredient.gesture === 'drizzle') return { display: 'none' };
+    // Don't show overlay for swoosh, scatter, drizzle, or quenelle gestures (rendered on canvas)
+    if (ingredient.gesture === 'swoosh' || ingredient.gesture === 'scatter' || ingredient.gesture === 'drizzle' || ingredient.gesture === 'quenelle') return { display: 'none' };
 
     // Use shape info for styling
     if (ingredient.shape.type === 'circle') {
@@ -1065,7 +1189,7 @@ export function GameScreen() {
 
       <div
         ref={containerRef}
-        className={`flex-1 w-full relative touch-none ${(swooshState.selected || dotState.selected || scatterState.selected || drizzleState.selected) ? 'cursor-crosshair' : ''}`}
+        className={`flex-1 w-full relative touch-none ${(swooshState.selected || dotState.selected || scatterState.selected || drizzleState.selected || quenelleState.selected) ? 'cursor-crosshair' : ''}`}
         style={{ touchAction: 'none' }}
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
@@ -1099,7 +1223,7 @@ export function GameScreen() {
           <TutorialManager
             gesture={currentGestureType}
             phase={tutorialPhase}
-            isDragging={isDragging || swooshState.active || scatterState.active || drizzleState.active}
+            isDragging={isDragging || swooshState.active || scatterState.active || drizzleState.active || quenelleState.active}
             isOverTarget={isOverTarget}
             enabled={tutorial.showHints}
           />
@@ -1112,14 +1236,14 @@ export function GameScreen() {
         <IngredientTray
           ingredient={canInteract ? currentIngredient : null}
           isDragging={isDragging}
-          isSelected={swooshState.selected || dotState.selected || scatterState.selected || drizzleState.selected}
+          isSelected={swooshState.selected || dotState.selected || scatterState.selected || drizzleState.selected || quenelleState.selected}
           gestureType={currentGestureType}
           remainingCount={dotState.selected ? dotState.remainingCount : multipointPlaceState.active ? multipointPlaceState.remainingCount : undefined}
           totalCount={dotState.selected ? (currentIngredientDef?.count ?? 1) : multipointPlaceState.active ? multipointPlaceState.totalCount : undefined}
           onDragStart={handleTrayDragStart}
           onDragMove={handleTrayDragMove}
           onDragEnd={handleTrayDragEnd}
-          onSelect={currentGestureType === 'drizzle' ? handleDrizzleSelect : currentGestureType === 'scatter' ? handleScatterSelect : currentGestureType === 'dot' ? handleDotSelect : handleSwooshSelect}
+          onSelect={currentGestureType === 'quenelle' ? handleQuenelleSelect : currentGestureType === 'drizzle' ? handleDrizzleSelect : currentGestureType === 'scatter' ? handleScatterSelect : currentGestureType === 'dot' ? handleDotSelect : handleSwooshSelect}
         />
 
         {/* Dragged element overlay */}
@@ -1133,8 +1257,8 @@ export function GameScreen() {
               className="pointer-events-none fixed"
               style={{
                 ...dragOverlayStyle,
-                left: dragState.x - (typeof dragOverlayStyle.width === 'number' ? dragOverlayStyle.width / 2 : 24),
-                top: dragState.y - (typeof dragOverlayStyle.height === 'number' ? dragOverlayStyle.height / 2 : 24),
+                left: dragState.x + touchDragOffset.x - (typeof dragOverlayStyle.width === 'number' ? dragOverlayStyle.width / 2 : 24),
+                top: dragState.y + touchDragOffset.y - (typeof dragOverlayStyle.height === 'number' ? dragOverlayStyle.height / 2 : 24),
               }}
             />
           )}

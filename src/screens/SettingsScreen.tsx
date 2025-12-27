@@ -170,7 +170,7 @@ export function SettingsScreen() {
 
   return (
     <PageTransition className="flex flex-col bg-foundation-100">
-      <Header title="Settings" showBack backTo="/levels" />
+      <Header title="Settings" showBack backTo="/" />
 
       <main className="flex-1 overflow-y-auto pt-16 px-4 pb-8">
         <motion.div

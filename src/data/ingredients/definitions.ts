@@ -33,7 +33,8 @@ export const butterPat: IngredientDefinition = {
   id: 'butter-pat',
   name: 'Butter',
   // Matches ButterPat.tsx: rect x=4 y=6 width=40 height=20 rx=2
-  silhouettePath: 'M 6 6 L 42 6 Q 44 6 44 8 L 44 24 Q 44 26 42 26 L 6 26 Q 4 26 4 24 L 4 8 Q 4 6 6 6 Z',
+  // Rectangle from (4,6) to (44,26) with rx=2 rounded corners
+  silhouettePath: 'M 6 6 H 42 Q 44 6 44 8 V 24 Q 44 26 42 26 H 6 Q 4 26 4 24 V 8 Q 4 6 6 6 Z',
   primaryColor: '#F5E6A3',
   dimensions: { width: 48, height: 32 },
   perspective: 'top-down',

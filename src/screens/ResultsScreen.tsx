@@ -52,12 +52,15 @@ function ScoreRow({ label, score, index }: ScoreRowProps) {
 
 export function ResultsScreen() {
   const navigate = useNavigate();
-  const { results, currentDish, resetGame, reset, setCurrentDish } = useGameStore();
+  const { results, currentDish, resetGame, reset, startDish } = useGameStore();
   const { completeDish, graduatedLinstitut, setGraduated } = useProgressStore();
   const reduceMotion = useSettingsStore((s) => s.reduceMotion);
 
   // State for showing next level preview
   const [showNextPreview, setShowNextPreview] = useState(false);
+
+  // Track if we're navigating away to prevent redirect
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Check if this is the final exam
   const dish = results ? dishDefinitions[results.dishId] : null;
@@ -71,12 +74,12 @@ export function ResultsScreen() {
   const nextDish = results ? getNextDish(results.dishId) : null;
   const nextLessonMeta = nextDish ? getLessonByDishId(nextDish.id) : null;
 
-  // Redirect to home if no results
+  // Redirect to home if no results (unless we're navigating to next level)
   useEffect(() => {
-    if (!results) {
+    if (!results && !isNavigating) {
       navigate('/');
     }
-  }, [results, navigate]);
+  }, [results, navigate, isNavigating]);
 
   // Record completion and handle graduation
   useEffect(() => {
@@ -112,10 +115,10 @@ export function ResultsScreen() {
 
   const handleStartNextLevel = () => {
     if (nextDish) {
-      // Reset the game state first, then set the new dish
-      // This clears phase, results, etc. so GameScreen doesn't redirect back
-      reset();
-      setCurrentDish(nextDish);
+      // Mark that we're navigating to prevent the redirect effect
+      setIsNavigating(true);
+      // Use startDish to reset phase to 'loading' (prevents GameScreen from redirecting back)
+      startDish(nextDish);
       navigate('/game');
     }
   };

@@ -10,18 +10,20 @@ import {
   ScatterManager,
   DrizzleManager,
   DustManager,
+  QuenelleManager,
   type PlacedVisual,
   type SwooshResult,
   type DotResult,
   type ScatterResult,
   type PlaceResult,
   type DustResult,
+  type QuenelleResult,
 } from './managers';
 import type { DishDefinition, GestureTarget } from '@/types/dishes';
 import type { PrecisionResult } from '../scoring/PrecisionScorer';
 
 // Re-export types for backwards compatibility
-export type { PlacedVisual, SwooshResult, DotResult, ScatterResult, PlaceResult, DustResult };
+export type { PlacedVisual, SwooshResult, DotResult, ScatterResult, PlaceResult, DustResult, QuenelleResult };
 
 export class Game {
   private renderer: Renderer;
@@ -42,6 +44,7 @@ export class Game {
   private scatterManager: ScatterManager | null = null;
   private drizzleManager: DrizzleManager | null = null;
   private dustManager: DustManager | null = null;
+  private quenelleManager: QuenelleManager | null = null;
 
   // Callbacks for drag events
   public onDragStart?: (point: TouchPoint) => void;
@@ -68,6 +71,11 @@ export class Game {
   public onDustStart?: (ingredientId: string) => void;
   public onDustMove?: (points: TouchPoint[]) => void;
   public onDustEnd?: (result: DustResult) => void;
+
+  // Callback for quenelle gesture
+  public onQuenelleStart?: (ingredientId: string) => void;
+  public onQuenelleMove?: (points: TouchPoint[]) => void;
+  public onQuenelleEnd?: (result: QuenelleResult) => void;
 
   // Callback for game loop tick (deltaTime in seconds)
   public onTick?: (deltaSeconds: number) => void;
@@ -166,6 +174,14 @@ export class Game {
       toPlateLocal
     );
 
+    this.quenelleManager = new QuenelleManager(
+      this.plate,
+      ghosts,
+      placedVisuals,
+      this.gestureRecognizer,
+      toPlateLocal
+    );
+
     // Wire up callbacks
     this.swooshManager.onSwooshStart = (id) => this.onSwooshStart?.(id);
     this.swooshManager.onSwooshMove = (points) => this.onSwooshMove?.(points);
@@ -180,6 +196,10 @@ export class Game {
     this.dustManager.onDustStart = (id) => this.onDustStart?.(id);
     this.dustManager.onDustMove = (points) => this.onDustMove?.(points);
     this.dustManager.onDustEnd = (result) => this.onDustEnd?.(result);
+
+    this.quenelleManager.onQuenelleStart = (id) => this.onQuenelleStart?.(id);
+    this.quenelleManager.onQuenelleMove = (points) => this.onQuenelleMove?.(points);
+    this.quenelleManager.onQuenelleEnd = (result) => this.onQuenelleEnd?.(result);
 
     this.placementManager.onDotPlaced = (result) => this.onDotPlaced?.(result);
   }
@@ -205,6 +225,9 @@ export class Game {
 
       // Update dust emitters
       this.dustManager?.updateDustEmitters(deltaSeconds);
+
+      // Update quenelle settling
+      this.quenelleManager?.updateSettling(deltaMs);
 
       // Call external tick handler
       this.onTick?.(deltaSeconds);
@@ -316,6 +339,23 @@ export class Game {
     return this.dustManager?.isActive ?? false;
   }
 
+  // Quenelle gesture delegation
+  startQuenelle(ingredientId: string, startPoint: TouchPoint): void {
+    this.quenelleManager?.start(ingredientId, startPoint);
+  }
+
+  updateQuenelle(point: TouchPoint): void {
+    this.quenelleManager?.update(point);
+  }
+
+  endQuenelle(endPoint: TouchPoint): QuenelleResult | null {
+    return this.quenelleManager?.end(endPoint) ?? null;
+  }
+
+  get isQuenelleActive(): boolean {
+    return this.quenelleManager?.isActive ?? false;
+  }
+
   // Coordinate helpers
   isPointOverPlate(canvasX: number, canvasY: number): boolean {
     if (!this.plate) return false;
@@ -388,6 +428,8 @@ export class Game {
     this.drizzleManager?.setCurrentDish(dish);
     this.drizzleManager?.clear();
     this.dustManager?.setCurrentDish(dish);
+    this.quenelleManager?.setCurrentDish(dish);
+    this.quenelleManager?.clear();
   }
 
   showGhostForIngredient(ingredientId: string): void {
@@ -427,6 +469,7 @@ export class Game {
     this.scatterManager?.destroy();
     this.drizzleManager?.destroy();
     this.dustManager?.destroy();
+    this.quenelleManager?.destroy();
     this.ghostManager?.destroy();
 
     if (this.ticker) {

@@ -4,6 +4,7 @@ export { SwooshManager } from './SwooshManager';
 export { ScatterManager } from './ScatterManager';
 export { DrizzleManager } from './DrizzleManager';
 export { DustManager } from './DustManager';
+export { QuenelleManager, type QuenelleResult } from './QuenelleManager';
 
 export type {
   GameContext,
