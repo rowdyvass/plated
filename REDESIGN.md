@@ -198,6 +198,13 @@ PlateModel (pure data: elements, transforms, sauce strokes, timestamps)
 1. **Phase 1 — Feel prototype (the bet).** One dish (Sole Meunière), no scoring: new plate +
    environment + lighting, fluid sauce, physical placement, real foley. If plating doesn't feel
    *good* here, nothing else matters. This is also where AI-generated assets get validated.
+
+   > **Status: built** — live at `/lab` (linked from the title screen), implemented in
+   > `src/lab/`. Ships the serializable `PlateModel`, the lit walnut-and-ceramic scene,
+   > metaball fluid sauce (draw slowly to pool, flick to spatter), lift/settle placement with
+   > contact shadows, parsley flick-scatter, pick-up/move/rotate of placed food, undo/clear,
+   > noise-foley audio, and "The Pass" beauty shot. Food art is authored SVG rasterized
+   > through one texture pipeline — the slot AI-generated painterly sprites drop into next.
 2. **Phase 2 — The Judge.** Plate model + composition scoring + the critique screen (heatmap
    overlay + per-element notes). Free-plating one dish end-to-end with a real grade.
 3. **Phase 3 — Structure.** Port the 8 lessons as tutorial mode (fixing tweeze/dust for real),

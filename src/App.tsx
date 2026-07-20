@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { TitleScreen, LinstitutMenuScreen, GameScreen, ResultsScreen, SettingsScreen } from '@/screens';
+import { LabScreen } from '@/lab/LabScreen';
 
 export default function App() {
   const location = useLocation();
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/game" element={<GameScreen />} />
           <Route path="/results" element={<ResultsScreen />} />
           <Route path="/settings" element={<SettingsScreen />} />
+          <Route path="/lab" element={<LabScreen />} />
         </Routes>
       </AnimatePresence>
     </>

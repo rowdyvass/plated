@@ -111,6 +111,16 @@ export function TitleScreen() {
         </Button>
       </motion.div>
 
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 1.2 }}
+        onClick={() => navigate('/lab')}
+        className="absolute bottom-20 text-xs tracking-[0.2em] text-text-tertiary hover:text-copper transition-colors uppercase"
+      >
+        The Feel Lab · rebuild preview
+      </motion.button>
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
