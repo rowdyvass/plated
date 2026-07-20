@@ -18,8 +18,6 @@ import {
 } from 'pixi.js';
 import { PlateModel, type LabItemKind, type SauceStroke } from './model';
 import {
-  FOOD_PLATE_SCALE,
-  loadFoodTextures,
   makeContactShadowTexture,
   makeLightPoolTexture,
   makePlateShadowTexture,
@@ -29,6 +27,7 @@ import {
   makeVignetteTexture,
   makeWoodTexture,
 } from './textures';
+import { FOOD_PLATE_SCALE, getFoodAssets } from './foodPaint';
 import { labAudio } from './audio';
 
 export interface LabPoint {
@@ -158,7 +157,10 @@ export class LabRenderer {
 
     this.splatTexture = makeSplatTexture();
     this.contactShadowTexture = makeContactShadowTexture();
-    this.foodTextures = await loadFoodTextures(this.plateRadius);
+    // Yield a frame so the loading state paints before the ~300ms food render
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    if (this.destroyed) return;
+    this.foodTextures = getFoodAssets().textures;
 
     app.ticker.add((ticker) => this.tick(ticker.deltaMS));
   }

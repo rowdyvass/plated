@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LabRenderer } from './renderer';
-import { FOOD_THUMBNAILS } from './textures';
+import { getFoodAssets } from './foodPaint';
 import { labAudio } from './audio';
 import type { LabItemKind } from './model';
 
@@ -247,21 +247,22 @@ export function LabScreen() {
             <span className="text-[10px] tracking-[0.15em] text-[#6b5637] uppercase">Beurre Noisette</span>
           </button>
           <div className="w-px h-12 bg-[#e2d7c3]" />
-          {TRAY_ITEMS.map((item) => (
-            <button
-              key={item.kind}
-              onPointerDown={handleTrayItemDown(item.kind)}
-              className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-black/5 transition-colors cursor-grab active:cursor-grabbing"
-            >
-              <img
-                src={FOOD_THUMBNAILS[item.kind]}
-                alt={item.label}
-                draggable={false}
-                className="h-9 w-auto max-w-[64px] object-contain pointer-events-none"
-              />
-              <span className="text-[10px] tracking-[0.15em] text-[#6b5637] uppercase">{item.label}</span>
-            </button>
-          ))}
+          {ready &&
+            TRAY_ITEMS.map((item) => (
+              <button
+                key={item.kind}
+                onPointerDown={handleTrayItemDown(item.kind)}
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-black/5 transition-colors cursor-grab active:cursor-grabbing"
+              >
+                <img
+                  src={getFoodAssets().thumbs[item.kind]}
+                  alt={item.label}
+                  draggable={false}
+                  className="h-9 w-auto max-w-[64px] object-contain pointer-events-none"
+                />
+                <span className="text-[10px] tracking-[0.15em] text-[#6b5637] uppercase">{item.label}</span>
+              </button>
+            ))}
         </div>
       </div>
 
